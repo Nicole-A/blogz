@@ -68,7 +68,7 @@ def post_entry():
         if title_error or entry_error:
             return render_template('new_post.html',title="New Entry", blog_entry=blog_entry, title_error=title_error, entry_error=entry_error)
         else:     
-            new_blog = Blog(blog_title, blog_entry, blog_owner)
+            new_blog = Blog(blog_title, blog_entry) #blog_owner)
             db.session.add(new_blog)
             db.session.commit()
             return redirect('/blog?id='+str(new_blog.id))
