@@ -1,4 +1,4 @@
-from flask import Flask, request, redirect, render_template
+from flask import Flask, request, redirect, render_template, session
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
@@ -6,7 +6,6 @@ app.config['DEBUG'] = True
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://blogz:juice@localhost:8889/blogz'
 app.config['SQLALCHEMY_ECHO'] = True
 db = SQLAlchemy(app)
-
 
 class Blog(db.Model):
 
@@ -20,7 +19,6 @@ class Blog(db.Model):
         self.body = body
         #self.owner_id = owner
 
-
 class User(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
@@ -31,8 +29,71 @@ class User(db.Model):
     def __init__(self,username, password):
         self.username = username
         self.password = password
- 
 
+@app.before_request
+def require_login():
+    if 'username' not in session:
+        redirect ('/login')
+
+@app.route('/login', methods=['POST', 'GET'])
+def login():
+    if request.method == 'POST' :
+        username = request.form['username']
+        password = request.form['password']
+        user = User.query.filter_by(username=username).first()
+        
+        if user and user.password == password:
+            session['username'] = username
+            return redirect ('/blog')
+        else:
+            #login fialed message
+            return '<h1>Error!</h1>'
+
+    return render_template('login.html')
+
+@app.route('/signup', methods=['POST', 'GET'])
+def signup():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        verify = request.form['verify']
+        
+        #add validation from user signup
+        username_error = ''
+        password_error = ''
+        notmatch_error = ''
+
+        if len(username) < 3 or len(username) > 20 or ' ' in username:
+            username_error = 'Not a valid username'
+    
+        if len(password) < 3 or len(password) > 20 or ' ' in password:
+            password_error = 'Not a valid password'
+
+        if  verify != password:
+            notmatch_error = 'Passwords must match'
+
+        if username_error or password_error or notmatch_error:
+            return render_template('signup.html', username_error=username_error, password_error=password_error, 
+            notmatch_error=notmatch_error)
+
+        
+        existing_user = User.query.filter_by(username=username).first()
+        if not existing_user:
+            new_user = User(username, password)
+            db.session.add(new_user)
+            db.session.commit()
+            session['username'] = username
+            return redirect ('/blog')
+        else:
+            #add message about username exists 
+            return "<h1>Duplicate user</h1>"
+
+    return render_template('signup.html')
+
+@app.route('/logout')
+def logout():
+    del session['username']
+    return redirect('/blog')
 
 @app.route('/blog', methods=['POST', 'GET'])
 def index():
@@ -47,8 +108,6 @@ def index():
         blogs = Blog.query.get(blog_id)
         return render_template('display.html', title= "Blog Post",blogs=blogs)
     
-
-
 @app.route('/newpost', methods=['POST', 'GET'])
 def post_entry():
 
@@ -74,28 +133,6 @@ def post_entry():
             return redirect('/blog?id='+str(new_blog.id))
         
     return render_template('new_post.html',title="New Entry")
-
-@app.route('/login', methods=['POST', 'GET'])
-def login():
-    if request.method == 'POST' :
-        username = request.form['username']
-        password = request.form['password']
-        user = User.query.filter_by(username=username).first()
-        
-        if user and user.password == password:
-            #remember user login
-            return redirect ('/')
-        else:
-            #login fialed message
-            pass
-
-    return render_template('login.html')
-
-
-
-@app.route('/signup', methods=['POST', 'GET'])
-def signup():
-    return render_template('signup.html')
 
 if __name__ == '__main__':
     app.run()
