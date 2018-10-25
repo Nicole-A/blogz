@@ -33,9 +33,20 @@ class User(db.Model):
 
 @app.before_request
 def require_login():
-    allowed_routes = ['login', 'signup','index','post_entry']
+    allowed_routes = ['login', 'signup','blog', 'index']
     if request.endpoint not in allowed_routes and 'username' not in session:
-        redirect ('/login')
+        return redirect ('/login')
+
+@app.route('/')
+def index():
+
+    #blog_owner = request.args.get('username')
+    #owner_id = request.args.get('user.id')
+    #user_blogs = request.args.get('user.blogs')
+
+    #if not owner_id:
+        users = User.query.all()
+        return render_template('index.html',title="Blogz", users=users)
 
 @app.route('/login', methods=['POST', 'GET'])
 def login():
@@ -47,7 +58,7 @@ def login():
         if user and user.password == password:
             session['username'] = username
             flash("Logged in")
-            return redirect ('/blog')
+            return redirect ('/newpost')
         else:
             flash("User password incorrect or user does not exist", 'error')
 
@@ -91,21 +102,26 @@ def signup():
 @app.route('/logout')
 def logout():
     del session['username']
-    return redirect('/blog')
+    flash("Logged out")
+    return redirect('/')
 
 @app.route('/blog', methods=['POST', 'GET'])
-def index():
+def blog():
 
     blog_title = request.args.get('blog_title')
-    blog_id = request.args.get('id')
-
-    if not blog_id:
-        blogs = Blog.query.all()
-        return render_template('blog.html',title="Build a Blog", blogs=blogs)
-    else:
+    blog_id = request.args.get('blogid')
+    owner_id = request.args.get('userid')
+    blogs = Blog.query.all()
+    
+    if owner_id:
+        blogs = Blog.query.filter_by(owner_id=owner_id).all()
+        return render_template('blog.html', title= "Blog Post",blogs=blogs)
+    if blog_id:
         blogs = Blog.query.get(blog_id)
         return render_template('display.html', title= "Blog Post",blogs=blogs)
-    
+
+    return render_template('blog.html',title="Blogz", blogs=blogs)
+
 @app.route('/newpost', methods=['POST', 'GET'])
 def post_entry():
 
@@ -114,7 +130,7 @@ def post_entry():
         entry_error = ''
         blog_title = request.form['blog_title']
         blog_entry = request.form['body']
-        blog_owner = User.query.filter_by(username=session['username']).first
+        blog_owner = User.query.filter_by(username=session['username']).first()
 
         if not blog_title:
             title_error = 'Enter a title'
